@@ -30,7 +30,7 @@
 
 ## Overview
 
-**Codity** is a self-hosted distributed job scheduler monorepo. It lets you enqueue background tasks (emails, image processing, financial transactions, reports), manage retry policies with configurable backoff strategies, set cron-based recurring schedules, and monitor job health across a horizontally-scalable worker cluster — all backed by MongoDB as the coordination engine.
+This Project lets you enqueue background tasks (emails, image processing, financial transactions, reports), manage retry policies with configurable backoff strategies, set cron-based recurring schedules, and monitor job health across a horizontally-scalable worker cluster — all backed by MongoDB as the coordination engine.
 
 ---
 
