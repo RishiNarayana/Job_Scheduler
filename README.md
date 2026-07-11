@@ -1,4 +1,4 @@
-# Codity — Distributed Job Scheduler
+# Distributed Job Scheduler
 
 > A production-grade, MongoDB-backed distributed job scheduling platform with an Express REST API, background worker cluster, React dashboard, and full automated test coverage.
 
