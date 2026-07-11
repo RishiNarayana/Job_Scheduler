@@ -461,5 +461,3 @@ When `attemptsMade >= maxAttempts`, the job is routed to the Dead-Letter Queue c
 ## License
 
 Private repository. All rights reserved.
-#   J o b _ S c h e d u l e r  
- 
