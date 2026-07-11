@@ -1,0 +1,23 @@
+{
+  "name": "job-scheduler-monorepo",
+  "private": true,
+  "workspaces": [
+    "api",
+    "worker",
+    "frontend"
+  ],
+  "scripts": {
+    "db:up": "docker-compose up -d mongodb redis",
+    "db:down": "docker-compose down",
+    "db:seed": "npm run --prefix api db:seed",
+    "start:api": "npm run --prefix api dev",
+    "start:worker": "npm run --prefix worker dev",
+    "start:frontend": "npm run --prefix frontend dev",
+    "build:all": "npm run build --workspaces --if-present",
+    "test:all": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@esbuild/win32-x64": "^0.28.1",
+    "esbuild": "^0.28.1"
+  }
+}

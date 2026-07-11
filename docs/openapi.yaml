@@ -1,0 +1,691 @@
+openapi: 3.0.3
+info:
+  title: Codity Distributed Job Scheduler API
+  description: REST API specification for managing jobs, queues, retry policies, cron templates, and active workers.
+  version: 1.0.0
+servers:
+  - url: http://localhost:4000
+    description: Local development server
+paths:
+  /health:
+    get:
+      summary: API Health Check
+      description: Returns the status of the API service.
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /api/v1/auth/register:
+    post:
+      summary: Register a new user
+      description: Registers a user, creates a default organization for them, and returns an access token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  example: securepassword123
+                fullName:
+                  type: string
+                  example: John Doe
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      email:
+                        type: string
+                      fullName:
+                        type: string
+                  organization:
+                    type: object
+                    properties:
+                      _id:
+                        type: string
+                      name:
+                        type: string
+                      slug:
+                        type: string
+        '400':
+          description: Bad request (missing fields or email already registered)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/login:
+    post:
+      summary: User authentication (Login)
+      description: Authenticates a user's credentials and returns a JWT access token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@codity.com
+                password:
+                  type: string
+                  format: password
+                  example: password123
+      responses:
+        '200':
+          description: Successful authentication
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      email:
+                        type: string
+                      fullName:
+                        type: string
+        '400':
+          description: Invalid credentials or missing fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/me:
+    get:
+      summary: Get current authenticated user
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current user profile details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  _id:
+                    type: string
+                  email:
+                    type: string
+                  fullName:
+                    type: string
+        '401':
+          description: Access token required
+        '403':
+          description: Invalid or expired token
+        '404':
+          description: User not found
+
+  /api/v1/organizations:
+    get:
+      summary: List organizations for the user
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of organizations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    _id:
+                      type: string
+                    name:
+                      type: string
+                    slug:
+                      type: string
+    post:
+      summary: Create a new organization
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - slug
+              properties:
+                name:
+                  type: string
+                  example: Engineering Org
+                slug:
+                  type: string
+                  example: engineering-org
+      responses:
+        '201':
+          description: Organization created successfully
+        '400':
+          description: Missing name/slug or slug already in use
+
+  /api/v1/projects:
+    get:
+      summary: List projects in an organization
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: organizationId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of projects
+        '400':
+          description: organizationId query parameter required
+        '403':
+          description: Access denied to this organization
+    post:
+      summary: Create a new project
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - organizationId
+                - name
+                - slug
+              properties:
+                organizationId:
+                  type: string
+                name:
+                  type: string
+                slug:
+                  type: string
+      responses:
+        '201':
+          description: Project created
+        '403':
+          description: Access denied
+
+  /api/v1/retry-policies:
+    get:
+      summary: List retry policies in a project
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of retry policies
+        '400':
+          description: projectId query parameter required
+    post:
+      summary: Create a new retry policy
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - projectId
+                - name
+                - type
+              properties:
+                projectId:
+                  type: string
+                name:
+                  type: string
+                type:
+                  type: string
+                  enum: [fixed, linear, exponential]
+                baseDelayMs:
+                  type: number
+                maxDelayMs:
+                  type: number
+                maxAttempts:
+                  type: number
+      responses:
+        '201':
+          description: Retry policy created
+        '400':
+          description: Missing required fields or duplicate name
+
+  /api/v1/queues:
+    get:
+      summary: List queues in a project
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of queues with populated retry policies
+    post:
+      summary: Create a new queue
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - projectId
+                - name
+              properties:
+                projectId:
+                  type: string
+                name:
+                  type: string
+                priority:
+                  type: number
+                concurrencyLimit:
+                  type: number
+                retryPolicyId:
+                  type: string
+      responses:
+        '201':
+          description: Queue created
+
+  /api/v1/queues/{id}/pause:
+    patch:
+      summary: Pause a queue
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Queue paused successfully
+        '404':
+          description: Queue not found
+
+  /api/v1/queues/{id}/resume:
+    patch:
+      summary: Resume a queue
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Queue resumed successfully
+        '404':
+          description: Queue not found
+
+  /api/v1/jobs:
+    get:
+      summary: List jobs in a queue with filters
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: queueId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated job list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Job'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  pages:
+                    type: integer
+        '400':
+          description: queueId required
+    post:
+      summary: Submit/Enqueue a background job
+      description: Enqueues a job into a queue. If an idempotency key is passed, duplicate calls are rejected and return the original job document (HTTP 200).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - queueId
+                - payload
+              properties:
+                queueId:
+                  type: string
+                payload:
+                  type: object
+                  description: Task payload parameters, validated per task type constraint.
+                scheduledAt:
+                  type: string
+                  format: date-time
+                idempotencyKey:
+                  type: string
+                retryPolicyId:
+                  type: string
+      responses:
+        '201':
+          description: Job created and queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job:
+                    $ref: '#/components/schemas/Job'
+                  duplicated:
+                    type: boolean
+                    example: false
+        '200':
+          description: Duplicate idempotencyKey submission returned gracefully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job:
+                    $ref: '#/components/schemas/Job'
+                  duplicated:
+                    type: boolean
+                    example: true
+        '400':
+          description: Validation error or missing fields (e.g. invalid task payload shape)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Queue not found
+
+  /api/v1/jobs/{id}:
+    get:
+      summary: Fetch job details, executions, and logs
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job details with attempt history and logs
+        '404':
+          description: Job not found
+
+  /api/v1/jobs/{id}/retry:
+    post:
+      summary: Retry a failed or dead-lettered job
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job status reset to queued for retry
+        '400':
+          description: Job is not in a retryable status (must be failed, dead_letter, or cancelled)
+        '404':
+          description: Job not found
+
+  /api/v1/jobs/{id}/cancel:
+    post:
+      summary: Cancel a pending or retrying job
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job status updated to cancelled
+        '400':
+          description: Job is not in a cancelable status (must be queued, scheduled, or retrying)
+        '404':
+          description: Job not found
+
+  /api/v1/scheduled-jobs:
+    get:
+      summary: List scheduled cron rules in a project
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of scheduled jobs
+        '400':
+          description: projectId query parameter required
+    post:
+      summary: Create a scheduled cron job rule
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - projectId
+                - queueId
+                - name
+                - cronExpression
+                - payload
+              properties:
+                projectId:
+                  type: string
+                queueId:
+                  type: string
+                name:
+                  type: string
+                cronExpression:
+                  type: string
+                payload:
+                  type: object
+                retryPolicyId:
+                  type: string
+      responses:
+        '201':
+          description: Scheduled cron rule created
+        '400':
+          description: Invalid cron expression or validation failure (e.g. invalid task payload)
+
+  /api/v1/scheduled-jobs/{id}/toggle:
+    patch:
+      summary: Toggle scheduled cron job active status
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scheduled job active status toggled
+        '404':
+          description: Scheduled job not found
+
+  /api/v1/scheduled-jobs/{id}:
+    delete:
+      summary: Delete a scheduled cron job rule
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scheduled job deleted
+        '404':
+          description: Scheduled job not found
+
+  /api/v1/workers:
+    get:
+      summary: Get active registered workers list
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of all registered worker nodes
+
+  /api/v1/dashboard/stats:
+    get:
+      summary: Get dashboard health and metrics statistics
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Aggregated dashboard stats (active workers count, job status counts, average execution durations, per-queue breakdown)
+        '400':
+          description: projectId query parameter required
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Invalid input parameters
+    Job:
+      type: object
+      properties:
+        _id:
+          type: string
+        queueId:
+          type: string
+        status:
+          type: string
+        payload:
+          type: object
+        attemptsMade:
+          type: integer
+        maxAttempts:
+          type: integer
+        scheduledAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time

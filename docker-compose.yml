@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6-jammy
+    container_name: job-scheduler-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: job-scheduler-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: job-scheduler-api
+    depends_on:
+      - mongodb
+      - redis
+    environment:
+      DATABASE_URL: mongodb://mongodb:27017/job_scheduler
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: change-me
+    ports:
+      - "4000:4000"
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    container_name: job-scheduler-worker
+    depends_on:
+      - mongodb
+      - redis
+    environment:
+      DATABASE_URL: mongodb://mongodb:27017/job_scheduler
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: change-me
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: job-scheduler-frontend
+    depends_on:
+      - api
+    ports:
+      - "5173:5173"
+
+volumes:
+  mongodata:
+  redisdata:
