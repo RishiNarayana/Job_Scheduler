@@ -455,6 +455,7 @@ When `attemptsMade >= maxAttempts`, the job is routed to the Dead-Letter Queue c
 | [`docs/CUSTOMER_GUIDE.md`](docs/CUSTOMER_GUIDE.md) | Step-by-step guide for new users |
 | [`docs/schema.md`](docs/schema.md) | Full MongoDB collection schema documentation |
 | [`docs/openapi.yaml`](docs/openapi.yaml) | OpenAPI 3.0 specification |
+| [`docs/er_diagram.md`](docs/er_diagram.md) | Entity Relationship Diagram |
 
 ---
 
